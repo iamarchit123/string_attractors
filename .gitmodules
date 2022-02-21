@@ -1,0 +1,3 @@
+[submodule "lz77-to-slp"]
+	path = lz77-to-slp
+	url = https://github.com/dominikkempa/lz77-to-slp.git
