@@ -45,114 +45,127 @@
 #include "compute_sa.hpp"
 #include "utils.hpp"
 #include <cstring>
-
-char *sliceString(unsigned char *str, int start, int end)
-{
-
-    int i;
-    int size = (end - start) + 2;
-    char *output = (char *)malloc(size * sizeof(char));
-
-    for (i = 0 ; i < size - 1; i++)
-    {
-        output[i] = str[start + i];
-    }
-
-    output[size-1] = '\0';
-
-    return output;
-}
+#include <map>
+using namespace std;
 
 template<
   typename char_type = std::uint8_t,
-  typename text_offset_type = std::uint64_t>
-struct linked_indexes{
-  typedef std::pair<text_offset_type, text_offset_type> pair_type;
-  pair_type p;
-  char* s;
-  uint32_t level;
-  
-  linked_indexes(){
-    s = NULL;
-    p = std::make_pair<text_offset_type, text_offset_type>(UINT64_MAX,UINT64_MAX);
-  }
+  typename text_offset_type = std::int64_t>
+struct Block {
+  text_offset_type start;
+  text_offset_type len;
+  text_offset_type end;
 
-  linked_indexes(uint32_t start, int attractor_loc_,int level_){
-    level = level_;
-    p = std::make_pair<text_offset_type, text_offset_type>(start, attractor_loc_);
-    s = NULL;
-  } 
-
-  linked_indexes(uint32_t level_, char *s_){
-    level = level_;
-    s = strdup(s_);
-    p = std::make_pair<text_offset_type, text_offset_type>(UINT64_MAX,UINT64_MAX);
-  }
-
-  void print(){
-    fprintf(stderr,"offset_start = %lu, attractor start index = %lu, level = %u, string is %s\n"
-    , p.first, p.second, level, s);
+  Block(text_offset_type m_start, text_offset_type m_len)
+  {
+    start = m_start;
+    len = m_len;
+    end = m_start + m_len;
   }
 
 };
 
 template<
   typename char_type = std::uint8_t,
-  typename text_offset_type = std::uint64_t>
-int find_nearest(std::vector<text_offset_type>att_pos, std::uint64_t ind){
-  uint64_t ind1 = 0;
-  while(1){
-    if(att_pos[ind1] >= ind)
-      return ind1;
-    ind1++;
+  typename text_offset_type = std::int64_t>
+struct linked_indexes{
+  typedef std::pair<text_offset_type, text_offset_type> pair_type;
+  pair_type p;
+  
+  linked_indexes(char_type* text, text_offset_type start,
+                 text_offset_type end, std::vector<text_offset_type>&att_pos,
+                 text_offset_type len)
+  {
+    text_offset_type attractor_loc_, offset;
+    find(text, start, end, att_pos, &attractor_loc_, &offset, len);
+    p = std::make_pair<text_offset_type, text_offset_type>( (long int)attractor_loc_, 
+                                                            (long int)offset);
   }
-}
 
-//To implement RMQ with binary search on top of SA later 
-template<
-  typename char_type = std::uint8_t,
-  typename text_offset_type = std::uint64_t>
-int find(char_type * text,int start,
- int len, std::uint32_t n){
+  long unsigned int start()
+  {
+    return p.first - p.second;
+  }
+
+ static void find(char_type * text,text_offset_type start, text_offset_type end,
+           std::vector<text_offset_type>&att_pos,text_offset_type *attractor_loc_, 
+           text_offset_type *offset, text_offset_type len) {
    
-    //fprintf(stderr,"Trying to find %s starting at index %d\n",text_to_find,start);
-    for(std::uint32_t i = 0; i<n;i++){
-      int j;
-      for(j = 0; j< len;j++){
-        if(text[i + j]!= text[start + j])
+    //This is very slow !! need to implement RMQ with binary search later on toop of it
+    *attractor_loc_ = -1;
+    *offset = -1;
+    end = min(len-1,end);
+    for (text_offset_type i = 0; i<len ; i++)
+    {
+
+      text_offset_type j;
+      for(j = start; j <=end && j < len ;j++) {
+        if (text[i + j - start] != text[j])
           break;
       }
-      if(j==len)
-        return i;
+      if(j==end+1 || j==len)
+      {
+        for(text_offset_type k = 0 ; k < att_pos.size(); k++)
+        {
+          if(att_pos[k]>=i && att_pos[k] <= (i + j - start))
+          {
+            *attractor_loc_ = att_pos[k];
+            *offset = att_pos[k] - i;
+            return;
+          }
+        }
+        fprintf(stderr,"Couldn't find a match the program may not work ahead\n");
+          exit(-1);
+      }
     }
-   return -1;
+  }
+
+  
+};
+
+template<
+  typename char_type = std::uint8_t,
+  typename text_offset_type = std::int64_t>
+std::vector<linked_indexes<>> make_linked_indexes(char_type *text,std::vector<Block<>>&b,
+                                        std::vector<text_offset_type>&att_pos,text_offset_type len)
+{
+  std::vector<linked_indexes<>>v;
+  for(text_offset_type i =0 ; i < b.size(); i++)
+  {
+    v.push_back(*(new linked_indexes<>(text,max((text_offset_type)0,b[i].start),b[i].end,att_pos,len)));
+  }
+  return v;
 }
 
 template<
   typename char_type = std::uint8_t,
-  typename text_offset_type = std::uint64_t>
+  typename text_offset_type = std::int64_t>
 class st_att{
   private:
-    std::uint32_t tau;
-    std::uint32_t gamma;
-    std::uint32_t alpha;
-    std::uint32_t n;
+    text_offset_type tau;
+    text_offset_type gamma;
+    text_offset_type alpha;
+    text_offset_type n;
     std::vector<text_offset_type>att_pos;
+    std::vector<text_offset_type>b_si;
     std::vector<std::vector<linked_indexes<>>>indexes;
+    std::map<text_offset_type,text_offset_type>att_map;
+    std::vector<char *>v_s;
 
   public:
-    st_att(std::uint32_t m_tau, char_type * text, std::uint64_t text_length){
-      std::uint32_t dim,temp, level;
+    st_att(text_offset_type m_tau, char_type * text, text_offset_type text_length){
       typedef std::pair<text_offset_type, text_offset_type> pair_type;
-      tau = m_tau;
       n = text_length;
+      text_offset_type block_len;
+      tau = m_tau;
+      std::vector<Block<>> v;
       // Allocate SA.
-      text_offset_type * const sa = new text_offset_type[text_length];
+      text_offset_type * const sa = new text_offset_type[n];
 
 
       // Compute SA.
       {
-        fprintf(stderr, "Compute SA... ");
+        fprintf(stderr, "Compute SA... \n");
         const long double start = utils::wclock();
         compute_sa(text, n, sa);
         const long double elapsed = utils::wclock() - start;
@@ -162,200 +175,99 @@ class st_att{
       // Compute parsing.
       std::vector<pair_type> parsing;
       {
-        fprintf(stderr, "Compute LZ77... ");
+        fprintf(stderr, "Compute LZ77... \n");
         const long double start = utils::wclock();
         compute_lz77::kkp2n(text, text_length, sa, parsing);
         const long double elapsed = utils::wclock() - start;
         fprintf(stderr, "%.2Lfs\n", elapsed);
       }
 
-      gamma = parsing.size();
       //TODO ::Discuss with prof or think about it how to set alpha
-      alpha = 5;
+
+      
 
       //Prepare att_pos
-      att_pos.push_back(0);
-      std::uint64_t ind = 0;
-      for(uint32_t i=1; i < gamma; i++) {
+      fprintf(stderr, "Compute LZ77... \n");
+      std::uint64_t ind = -1;
+      for(uint32_t i=0; i < parsing.size(); i++) {
         ind += parsing[i].second ? parsing[i].second : 1;
+        att_map[ind] = i;
         att_pos.push_back(ind);
       }
-
-      for(uint32_t i=0; i < gamma; i++)
-        fprintf(stderr,"paramterer 1 = %lu, parameter 2 = %lu, att_pos = %lu\n", parsing[i].first, parsing[i].second, att_pos[i]);
-      fprintf(stderr, "gamma = %u\n",gamma);
-      fprintf(stderr, "tau = %u\n", tau);
-      fprintf(stderr, "alpha = %u\n", alpha);
-      fprintf(stderr, "Text length = %u\n", n);
-
-      dim = n/gamma;
-      temp = n/gamma;
-      
-      level = 0;
-      
-      //Make vector of vectors fill by level
-      while(1){
-        fprintf(stderr,"Calculating Level %d\n",level);
-        if(!level){
-          indexes.resize(level + 1);
-          //Make first layer of n/gamma pointers ready
-          for( std::uint32_t i = 0; i < n; i+=dim ){
-            uint32_t len = std::min(dim,n-i);
-            fprintf(stderr,"Before find\n");        
-            ind = find(text, i, len,n);
-            fprintf(stderr,"After find ind = %lu\n",ind);
-            if(temp > alpha)
-                indexes[0].push_back(linked_indexes<>(ind,find_nearest(att_pos,ind),0));
-              else
-                indexes[0].push_back(linked_indexes<>(0, sliceString(text,ind,ind + len -1)));
-            fprintf(stderr,"After initializing vector for i = %u\n",i);
-          }
-        }
-        else{
-          indexes.resize(level + 1);
-          indexes[level].resize((4*tau-1)*gamma);
-          int skipper = 4*tau - 1;
-          //make  (4*tau-1) * gamma pointers ready
-          for(uint32_t i=0; i < gamma; i++) {
-            int start = (int)att_pos[i] - (tau*temp) + 1, end;
-            int tempstart = start;
-            fprintf(stderr,"Filling index %d with start = %d\n",i,start);
-            for(uint32_t j=1; j <= 2*tau; j++) { 
-              if ((tempstart + (int)temp) <= 0 || tempstart >= (int)n){
-                indexes[level][i*skipper + j-1] = linked_indexes<>();
-                fprintf(stderr,"Hello from j = %d\n ",j);
-                tempstart += temp;  
-                continue;
-              }  
-              end = std::min(tempstart + temp - 1, n - 1);
-              tempstart = std::max(tempstart, 0);
-              ind = find(text, (uint32_t)tempstart, (end - tempstart + 1), n);
-              
-              if(temp > alpha)
-                indexes[level][i*skipper + j-1] = linked_indexes<>(ind,find_nearest(att_pos,ind),level);
-              else{
-                fprintf(stderr,"Filling index %d with start =%d end =%d\n ",i*skipper+j-1,tempstart,end);
-                indexes[level][i*skipper + j-1] = linked_indexes<>(level, sliceString(text,tempstart,end));
-              }
-              tempstart = end + 1;
-          }
-          start = (int)att_pos[i] - (tau*temp) + 1 + temp/2;
-          tempstart = start;
-          for(uint32_t j=1; j <= 2*tau - 1; j++){
-              
-              if ((tempstart + (int)temp) <= 0 || tempstart >= (int)n){
-                indexes[level][i*skipper + 2* tau + j-1] = linked_indexes<>();
-                fprintf(stderr,"Hello from j = %d\n ",j);
-                tempstart+=temp;
-                continue;
-              }
-              end = std::min(tempstart + temp - 1, n - 1);
-              tempstart = std::max(tempstart, 0);
-              ind = find(text, (uint32_t)tempstart, (end - tempstart + 1), n);
-              if(temp > alpha)
-                indexes[level][i*skipper + 2* tau + j-1] = linked_indexes<>(ind,find_nearest(att_pos,ind),level);
-              else{
-                fprintf(stderr,"Filling index %d with start =%d end =%d\n ",i*skipper + 2* tau + j-1,tempstart,end);
-                indexes[level][i*skipper + 2* tau + j-1] = linked_indexes<>(level, sliceString(text,tempstart,end));
-              }
-              tempstart=end + 1;
-            }
-          }
-        }
-
-        fprintf(stderr,"Level %d calculated\n",level);
-        if(temp <= alpha){
-          alpha = temp;
-          break;
-        }
-        
-        temp/=tau;
-        level++;
-        
-      }
-
-      fprintf(stderr,"No of levels is %lu\n",indexes.size());
-      for(std::uint32_t i=0; i < indexes.size(); i++) {
-        fprintf(stderr,"Level %u size is %lu\n", i, indexes[i].size());
-        for(std::uint32_t j = 0; j < indexes[i].size(); j++){
-            fprintf(stderr,"index %u is ", j);
-            indexes[i][j].print();
+      gamma = att_pos.size();
+      //Make level 0 and assign alpha 
+      block_len = n / gamma + (n % gamma !=0);
+      for(text_offset_type i = 0; i < n; i+=block_len)
+          v.push_back(Block<>(i, block_len));
+      b_si.push_back(block_len);
+      indexes.push_back(make_linked_indexes<>(text,v,att_pos,n));
+      alpha = max((int)ceil(log(block_len)/log(tau)),1);
+      //Now make all other levels
+      while(block_len >= 2 * alpha)
+      {
+        block_len = block_len / tau + (block_len % tau !=0);
+        b_si.push_back(block_len);
+        v.clear();
+        for(text_offset_type i=0; i < att_pos.size(); i++)
+        {
+          text_offset_type begin = att_pos[i] - tau * block_len;
+          text_offset_type end = att_pos[i] + tau * block_len;
+          for( text_offset_type j=begin; j < end; j+=block_len)
+            v.push_back(Block<>(j,block_len));
+          indexes.push_back(make_linked_indexes<>(text,v,att_pos,n));
         }
       }
+      //Code for appending strings from v
+      for(text_offset_type i =0 ; i < v.size(); i++)
+      {
+        Block<> t = v[i];
+        char *s = new char[t.len];
+        for(text_offset_type j = t.start; j < t.end; j++)
+        {
+          if(j>=0 && j<n)
+            s[j - t.start] = text[j];
+          else
+          s[j - t.start] = '$';
+        }
+        v_s.push_back(s);
+      }
+      v.clear();
   }
 
-  char * query_alpha(int start, int p_len){
-    int level = 0;
-    int start_cell = start/(n/gamma);
-    int skipper = 4*tau - 1;
-    int temp = n/gamma;
-    int start_loc = start/temp * temp;
-    while( indexes[level][start_cell].s==NULL ){
-      temp/=tau;
-      start = indexes[level][start_cell].p.first + (start - start_loc);
-      int att_loc = indexes[level][start_cell].p.second;
-      int start1 = (int)att_pos[att_loc] - ( tau * temp ) + 1;
-      int start2 = start1 + temp/2;
-      bool done = false;
-      
-      
-
-      for(uint32_t i=0; i < (2*tau - 1); i++ ){
-        fprintf(stderr,"start = %d start1 = %d start2 = %d\n",start, start1, start2);
-        if(start >= start1 && (start + p_len) <= start1 + temp){
-          start_cell = att_loc * skipper + i;
-          start_loc  = start1;
-          done = true;
-          break;
-         }
-        else if(start >=start2 && (start + p_len) <= start2 + temp){
-          start_cell = att_loc * skipper + 2* tau + i;
-          start_loc = start2;
-          done = true;
-          break;
-        }
-
-        start1 += temp;
-        start2 += temp;
-      }
-
-      if(!done){
-        start_cell = att_loc * skipper + 2*tau - 1;
-        start_loc = start1;
-      }
-      if(start_loc < 0)
-        start_loc = 0;
-      level++;
-      fprintf(stderr, "level = %d start_cell = %d\n",level,start_cell);
+  char query_alpha(text_offset_type off, uint32_t level, text_offset_type attractor)
+  {
+    text_offset_type block_position, offset, block_len = b_si[level];
+    if (level == 0)
+    {
+      block_position = off/block_len;
+      offset = off % block_len;
     }
-    return indexes[level][start_cell].s + start - start_loc;
+    else
+    { 
+      block_position = att_map[attractor] * tau * 2 + tau + (off - attractor) / block_len;
+      offset = (off - attractor) % block_len;
+    }
+    if (level == b_si.size() - 1)
+      return v_s[block_position][offset];
+    
+    linked_indexes<> l = indexes[level][block_position];
+      
+    return query_alpha(
+      l.start() + offset,
+      level + 1,
+      l.p.first
+    );
   }
 
   //Store expilcit strings here
-  char * query(int start, int len){
-    int end = start + len -1;   
-    int si = len + 1;
-    char *output = (char *)malloc(si * sizeof(char));
-    int tempend,templen;
-    //fprintf(stderr,"alpha is %u\n", alpha);
-    for(int i=start;i <= end; i+=alpha){
-      tempend = i+ alpha - 1;
-      tempend = std::min(tempend,end);
-      //fprintf(stderr,"1 start = %d end =%d\n",i,tempend);
-      if((i/(n/gamma)) != (tempend/(n/gamma))){
-        //fprintf(stderr, "WTF\n");
-        tempend = (i/(n/gamma) + 1) * (n/gamma) - 1;
-      }
-      tempend = std::min(tempend,end);
-      fprintf(stderr,"start =%d end =%d\n",i,tempend);
-      templen = tempend - i + 1;
-      strncpy(output + (i - start), query_alpha(i,templen),templen);
-      i += (templen - alpha);
-      //fprintf(stderr,"i=%d\n",i);
-
+  char * query(text_offset_type start, text_offset_type len){
+    char * s = new char[len+1];
+    for(text_offset_type i = 0 ; i < len; i++)
+    {
+      s[i] = query_alpha(start + i,0,-1);
     }
-    output[si-1] = '\0';
-    return output;
+    s[len]='\0';
+    return s; 
   }
 
 };

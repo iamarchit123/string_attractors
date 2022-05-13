@@ -46,26 +46,14 @@
 #include "../include/uint40.hpp"
 #include "../include/compute_st_att.hpp"
 
-std::uint8_t * generate_string(int alphabet_size,int length){
-        std::uint8_t * const text = new std::uint8_t[length+1];
+std::uint8_t *generate_string(int alphabets, int length) {
+        std::uint8_t * const text = new std::uint8_t[length];
         for(int i=0;i<length;i++)
-                text[i] = ('a' + rand()%alphabet_size);
-        text[length] = '\0'; 
+                text[i] = rand()%alphabets + 'a';
         return text;
 
 }
 
-bool test(char *text,int start,int end,st_att<> *st_att_file){
-  char * x = st_att_file->query(start,end - start + 1);
-  fprintf(stderr,"%s\n",x);
-  for(int i = start; i <= end ; i++){
-    if(*(text + i) != *(x +(i - start ))){
-      fprintf(stderr,"Index %d failed\n",i);
-      return false;
-    }
-  }
-  return true;
-}
 
 //=============================================================================
 // Computes the string atractor parsing of the file given
@@ -74,117 +62,43 @@ bool test(char *text,int start,int end,st_att<> *st_att_file){
 //=============================================================================
 template<
   typename char_type = std::uint8_t,
-  typename text_offset_type = std::uint64_t>
-void compute_st_att(
-    std::string text_filename) {
+  typename text_offset_type = std::int64_t>
+void test_st_att(void) 
+  {
+    //const char *z = "CDABCCDABCCA";
+    //std::uint64_t text_length = 12;
+    //char_type *text;
+    //text = generate_string(z, text_length);
+    int alphabet_size = 26, testcases  = 10,text_size = 2000, text_length, alphabets,temp;
+    int start ,end;
+    char_type *text;
 
-  // Declare typedefs.
-  // Turn paths absolute.                                                       
-  text_filename = utils::absolute_path(text_filename);                          
-  char_type* text;
-  int start,end;
-  //output_filename = utils::absolute_path(output_filename);
-
-  // Get filesize.
-  //const std::uint64_t text_length = utils::file_size(text_filename);
-
-  /* Print parameters.
-  fprintf(stderr, "Construct string attractor data structure\n");
-  fprintf(stderr, "Timestamp = %s", utils::get_timestamp().c_str());
-  fprintf(stderr, "Text filename = %s\n", text_filename.c_str());
-  //fprintf(stderr, "Output filename = %s\n", output_filename.c_str());
-  fprintf(stderr, "Text length = %lu\n", text_length);
-  fprintf(stderr, "sizeof(char_type) = %lu\n", sizeof(char_type));
-  fprintf(stderr, "sizeof(text_offset_type) = %lu\n",
-      sizeof(text_offset_type));
-  fprintf(stderr, "\n\n");
-  */
-  // Allocate text.
-  int alphabet_size = 1, testcases  = 10,text_size = 20, text_length, alphabets;
-  
-  while(testcases--) {
-      text_length = rand()%text_size + 1;
+      text_length = 2000;
       alphabets = rand()%alphabet_size+1;
-      //alphabets = 1;
       text = generate_string(alphabets, text_length);
-    
-
-  // Read text.
-  /*
-  {
-    fprintf(stderr, "Read text... ");
-    long double start = utils::wclock();
-    utils::read_from_file(text, text_length, text_filename);
-    long double elapsed = utils::wclock() - start;
-    fprintf(stderr, "%.2Lfs\n", elapsed);
-  }
-  */
-  fprintf(stderr,"%s\n",text);
-  st_att<> * st_att_file = new st_att<>(2, text,text_length);
-  for(int k=0; k< 100; k++){
-    start = rand()%text_length;
-    end = rand()%text_length;
-    if(start > end){
-      int temp = start;
-      start = end;
-      end = temp;
+    while(testcases--) {
+      start = rand()%text_length;
+      end = rand()%text_length;
+      if(start > end){
+        temp = end;
+        end = start;
+        start = temp;
+      }
+      st_att<> * st_att_file = new st_att<>(10, text,  text_length);
+      char *x = st_att_file->query(start,end - start + 1);
+      for(int i=start; i< end; i++)
+      {
+        if(x[i - start]!= text[i])
+        {
+          fprintf(stderr,"Testcase %d failed for query %d %d %d\n",start , end , i);
+        }
+      }
+      fprintf(stderr,"Testcase %d passed\n",testcases);
+      
     }
-    fprintf(stderr,"Query for start =%d end = %d\n",start,end);
-    bool x = test((char *)text,start,end,st_att_file);
-    if(x== false) {
-      fprintf(stderr,"Failed %s with start = %d end %d\n",text, start, end);
-      return; 
-    }  
+
+    
   }
-  
-  }
-  // Allocate SA.
-  /*
-
-  // Compute SA.
-  {
-    fprintf(stderr, "Compute SA... ");
-    const long double start = utils::wclock();
-    compute_sa(text, text_length, sa);
-    const long double elapsed = utils::wclock() - start;
-    fprintf(stderr, "%.2Lfs\n", elapsed);
-  }
-
-  // Compute parsing.
-  std::vector<pair_type> parsing;
-  {
-    fprintf(stderr, "Compute LZ77... ");
-    const long double start = utils::wclock();
-    compute_lz77::kkp2n(text, text_length, sa, parsing);
-    const long double elapsed = utils::wclock() - start;
-    fprintf(stderr, "%.2Lfs\n", elapsed);
-  }
-
-
-  //Extract 
-  // Print parsing size.
-  // fprintf(stderr, "Parsing size = %lu\n", parsing.size());
-
-  // Write parsing to file.
-  {
-    fprintf(stderr, "Write parsing to file... ");
-    const long double start = utils::wclock();
-    const pair_type * const parsing_data = parsing.data();
-    utils::write_to_file<pair_type>(parsing_data,
-        parsing.size(), output_filename);
-    const long double elapsed = utils::wclock() - start;
-    fprintf(stderr, "%.2Lfs\n", elapsed);
-  }
-
-  // Clean up.
-  delete[] sa;
-  delete[] text;
-  */
-  // Print final message.
-  fprintf(stderr, "Computation finished\n");
-  //test(st_att_file, text, text_length);
-  fprintf(stderr, "Testing done\n");
-}
 
 //=============================================================================
 // Print usage instructions and exit.
@@ -290,15 +204,13 @@ int main(int argc, char **argv) {
 
     // Otherwise, we proceed.
     free(line);
+  // Set types.
   }
 
-  // Set types.
   //typedef std::uint8_t char_type;
   //typedef uint40 text_offset_type;
 
   // Run the lz77 parsing algorithm.
-  compute_st_att(
-      text_filename);
+  test_st_att<>();
 
 }
-
