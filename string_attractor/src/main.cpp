@@ -50,6 +50,9 @@ std::uint8_t *generate_string(int alphabets, int length) {
         std::uint8_t * const text = new std::uint8_t[length];
         for(int i=0;i<length;i++)
                 text[i] = rand()%alphabets + 'a';
+        for(int i=0;i<length;i++)
+                fprintf(stderr,"%c",text[i]);
+        fprintf(stderr,"\n");
         return text;
 
 }
@@ -69,12 +72,12 @@ void test_st_att(void)
     //std::uint64_t text_length = 12;
     //char_type *text;
     //text = generate_string(z, text_length);
-    int alphabet_size = 26, testcases  = 10,text_size = 2000, text_length, alphabets,temp;
+    int alphabet_size = 26, testcases  = 10,text_size = 20, text_length, alphabets,temp;
     int start ,end;
     char_type *text;
 
-      text_length = 2000;
-      alphabets = rand()%alphabet_size+1;
+      text_length = 20000;
+      alphabets = 2;
       text = generate_string(alphabets, text_length);
     while(testcases--) {
       start = rand()%text_length;
@@ -84,13 +87,14 @@ void test_st_att(void)
         end = start;
         start = temp;
       }
-      st_att<> * st_att_file = new st_att<>(10, text,  text_length);
+      st_att<> * st_att_file = new st_att<>(2, text,  text_length);
       char *x = st_att_file->query(start,end - start + 1);
-      for(int i=start; i< end; i++)
+      for(int i=start; i<= end; i++)
       {
         if(x[i - start]!= text[i])
         {
-          fprintf(stderr,"Testcase %d failed for query %d %d %d\n",start , end , i);
+          fprintf(stderr,"Testcase %d failed for query %d %d %d %c %c\n",testcases, start , end , i, x[i - start],text[i]);
+          exit(-1);
         }
       }
       fprintf(stderr,"Testcase %d passed\n",testcases);

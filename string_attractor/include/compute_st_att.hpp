@@ -151,7 +151,7 @@ class st_att{
     std::vector<std::vector<linked_indexes<>>>indexes;
     std::map<text_offset_type,text_offset_type>att_map;
     std::vector<char *>v_s;
-
+    char_type *t;
   public:
     st_att(text_offset_type m_tau, char_type * text, text_offset_type text_length){
       typedef std::pair<text_offset_type, text_offset_type> pair_type;
@@ -159,6 +159,7 @@ class st_att{
       text_offset_type block_len;
       tau = m_tau;
       std::vector<Block<>> v;
+      t = text;
       // Allocate SA.
       text_offset_type * const sa = new text_offset_type[n];
 
@@ -202,7 +203,9 @@ class st_att{
       b_si.push_back(block_len);
       indexes.push_back(make_linked_indexes<>(text,v,att_pos,n));
       alpha = max((int)ceil(log(block_len)/log(tau)),1);
+      //fprintf(stderr, "aplha = %ld",alpha);
       //Now make all other levels
+      //alpha = 2;
       while(block_len >= 2 * alpha)
       {
         block_len = block_len / tau + (block_len % tau !=0);
@@ -214,10 +217,15 @@ class st_att{
           text_offset_type end = att_pos[i] + tau * block_len;
           for( text_offset_type j=begin; j < end; j+=block_len)
             v.push_back(Block<>(j,block_len));
-          indexes.push_back(make_linked_indexes<>(text,v,att_pos,n));
+          
         }
+        if(block_len >= 2 * alpha)
+          indexes.push_back(make_linked_indexes<>(text,v,att_pos,n));
+        else
+          break;  
       }
-      //Code for appending strings from v
+      for(text_offset_type level=0; level < b_si.size();level++)
+        fprintf(stderr,"Level %ld size is %ld\n",level,b_si[level]);
       for(text_offset_type i =0 ; i < v.size(); i++)
       {
         Block<> t = v[i];
@@ -231,12 +239,15 @@ class st_att{
         }
         v_s.push_back(s);
       }
+      fprintf(stderr, "last blocksize is %ld\n",v_s.size());
       v.clear();
   }
 
-  char query_alpha(text_offset_type off, uint32_t level, text_offset_type attractor)
+  void query_alpha(text_offset_type off, uint32_t level, text_offset_type attractor,
+                   text_offset_type *temp_len, char *s,text_offset_type len)
   {
     text_offset_type block_position, offset, block_len = b_si[level];
+    fprintf(stderr,"Level = %ld\n",level);
     if (level == 0)
     {
       block_position = off/block_len;
@@ -246,26 +257,48 @@ class st_att{
     { 
       block_position = att_map[attractor] * tau * 2 + tau + (off - attractor) / block_len;
       offset = (off - attractor) % block_len;
+      if(offset < 0){
+        block_position--;
+        offset += block_len;
+      }
     }
     if (level == b_si.size() - 1)
-      return v_s[block_position][offset];
-    
+    {
+      //for(text_offset_type i=offset; i <block_len ; i++)
+      //{
+        //fprintf(stderr,"Here querying %ld %ld\n",block_position,offset);
+        s[*temp_len] = v_s[block_position][offset];
+        (*temp_len)++;
+       // fprintf(stderr,"Here2\n");
+        //if(*temp_len==len)
+         // break;
+      //}
+      return;
+    }
+
     linked_indexes<> l = indexes[level][block_position];
       
     return query_alpha(
-      l.start() + offset,
+      l.start() + offset, 
       level + 1,
-      l.p.first
+      l.p.first,
+      temp_len,
+      s,
+      len
     );
   }
 
   //Store expilcit strings here
   char * query(text_offset_type start, text_offset_type len){
     char * s = new char[len+1];
-    for(text_offset_type i = 0 ; i < len; i++)
+    fprintf(stderr, "Querying %ld to %ld\n",start,start+len-1);
+    text_offset_type temp_len = 0;
+    while(temp_len!=len)
     {
-      s[i] = query_alpha(start + i,0,-1);
+      fprintf(stderr, "Querying now position = %ld\n",start+temp_len);
+      query_alpha(start+temp_len,0,-1,&temp_len,s,len);
     }
+
     s[len]='\0';
     return s; 
   }
