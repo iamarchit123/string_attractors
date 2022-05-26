@@ -44,14 +44,16 @@
 #include "compute_lz77.hpp"
 #include "compute_sa.hpp"
 #include "utils.hpp"
+#include "rmq.hpp"
 #include <cstring>
 #include <map>
 using namespace std;
 
-template<
-  typename char_type = std::uint8_t,
-  typename text_offset_type = std::int64_t>
-struct Block {
+template <
+    typename char_type = std::uint8_t,
+    typename text_offset_type = std::int64_t>
+struct Block
+{
   text_offset_type start;
   text_offset_type len;
   text_offset_type end;
@@ -62,24 +64,25 @@ struct Block {
     len = m_len;
     end = m_start + m_len;
   }
-
 };
 
-template<
-  typename char_type = std::uint8_t,
-  typename text_offset_type = std::int64_t>
-struct linked_indexes{
+template <
+    typename char_type = std::uint8_t,
+    typename text_offset_type = std::int64_t>
+struct linked_indexes
+{
   typedef std::pair<text_offset_type, text_offset_type> pair_type;
   pair_type p;
-  
-  linked_indexes(char_type* text, text_offset_type start,
-                 text_offset_type end, std::vector<text_offset_type>&att_pos,
-                 text_offset_type len)
+
+  linked_indexes(char_type *text, text_offset_type start,
+                 text_offset_type end, std::vector<text_offset_type> &att_pos,
+                 text_offset_type len, rmq<> *sa_rmq,
+                 text_offset_type * const sa)
   {
     text_offset_type attractor_loc_, offset;
-    find(text, start, end, att_pos, &attractor_loc_, &offset, len);
-    p = std::make_pair<text_offset_type, text_offset_type>( (long int)attractor_loc_, 
-                                                            (long int)offset);
+    find(text, start, end, att_pos, &attractor_loc_, &offset, len,sa_rmq,sa);
+    p = std::make_pair<text_offset_type, text_offset_type>((long int)attractor_loc_,
+                                                           (long int)offset);
   }
 
   long unsigned int start()
@@ -87,177 +90,248 @@ struct linked_indexes{
     return p.first - p.second;
   }
 
- static void find(char_type * text,text_offset_type start, text_offset_type end,
-           std::vector<text_offset_type>&att_pos,text_offset_type *attractor_loc_, 
-           text_offset_type *offset, text_offset_type len) {
-   
-    //This is very slow !! need to implement RMQ with binary search later on toop of it
+  static void find(char_type *text, text_offset_type start, text_offset_type end,
+                   std::vector<text_offset_type> &att_pos, text_offset_type *attractor_loc_,
+                   text_offset_type *offset, text_offset_type len, rmq<> *sa_rmq,
+                   text_offset_type * const sa)
+  {
     *attractor_loc_ = -1;
     *offset = -1;
     end = min(len-1,end);
-    for (text_offset_type i = 0; i<len ; i++)
+    if (end  < 0 || start >=len)
+      return;
+    //fprintf(stderr,"Archit here1\n");
+    text_offset_type low=0, hi = len-1,r1,r2,mid,temp_st;
+    while(low < hi)
+    {
+      mid = (low+hi)/2;
+      temp_st = sa[mid];
+      text_offset_type j = start;
+      for(; j <=end;j++)
+      {
+        if((temp_st+j-start) == len || text[temp_st + j - start] < text[j])
+        {
+          low = mid + 1;
+          break;
+        }
+        else if(text[temp_st + j - start] > text[j]){
+          hi = mid - 1;
+          break;
+        }
+      }
+      if(j==(end+1))
+        hi = mid;
+      //fprintf(stderr,"Archit Chuda1 ,low = %ld hi = %ld\n , j = %ld , end = %ld\n",low,hi,
+      //j,end);
+    }
+
+    r1 = low;
+    low = 0;
+    hi = len - 1;
+    while(low < hi)
+    {
+      mid = (low+hi+1)/2;
+      temp_st = sa[mid];
+      text_offset_type j = start;
+      for(; j <=end;j++)
+      {
+        if((temp_st+j-start) == len || text[temp_st + j - start] < text[j]){
+          low = mid + 1;
+          break;
+        }
+        else if(text[temp_st + j - start] > text[j]){
+          hi = mid - 1;
+          break;
+        }
+      }
+      if(j==(end+1))
+        low = mid;
+      //fprintf(stderr,"Archit Chuda2\n");
+    }
+    r2 = hi;
+    text_offset_type x = sa_rmq->rmq_min(r1,r2);
+    //fprintf(stderr,"Archit here2\n");
+    for(text_offset_type k = 0 ; k < att_pos.size(); k++)
+    {
+      if(att_pos[k]>=x && att_pos[k] <= (x + end - start))
+      {
+            *attractor_loc_ = att_pos[k];
+            *offset = att_pos[k] - x;
+            return;
+      }
+    }
+
+    //This is very slow !! need to implement RMQ with binary search later on toop of it
+    /**attractor_loc_ = -1;
+    *offset = -1;
+    end = min(len - 1, end);
+    for (text_offset_type i = 0; i < len; i++)
     {
 
       text_offset_type j;
-      for(j = start; j <=end && j < len ;j++) {
+      for (j = start; j <= end && j < len; j++)
+      {
         if (text[i + j - start] != text[j])
           break;
       }
-      if(j==end+1 || j==len)
+      if (j == end + 1 || j == len)
       {
-        for(text_offset_type k = 0 ; k < att_pos.size(); k++)
+        for (text_offset_type k = 0; k < att_pos.size(); k++)
         {
-          if(att_pos[k]>=i && att_pos[k] <= (i + j - start))
+          if (att_pos[k] >= i && att_pos[k] <= (i + j - start))
           {
             *attractor_loc_ = att_pos[k];
             *offset = att_pos[k] - i;
             return;
           }
         }
-        fprintf(stderr,"Couldn't find a match the program may not work ahead\n");
-          exit(-1);
+        fprintf(stderr, "Couldn't find a match the program may not work ahead\n");
+        exit(-1);
       }
-    }
+    }*/
   }
-
-  
 };
 
-template<
-  typename char_type = std::uint8_t,
-  typename text_offset_type = std::int64_t>
-std::vector<linked_indexes<>> make_linked_indexes(char_type *text,std::vector<Block<>>&b,
-                                        std::vector<text_offset_type>&att_pos,text_offset_type len)
+template <
+    typename char_type = std::uint8_t,
+    typename text_offset_type = std::int64_t>
+std::vector<linked_indexes<>> make_linked_indexes(char_type *text, std::vector<Block<>> &b,
+                                                  std::vector<text_offset_type> &att_pos, text_offset_type len,
+                                                  rmq<> *sa_rmq,
+                                                  text_offset_type * const sa)
 {
-  std::vector<linked_indexes<>>v;
-  for(text_offset_type i =0 ; i < b.size(); i++)
+  std::vector<linked_indexes<>> v;
+  for (text_offset_type i = 0; i < b.size(); i++)
   {
-    v.push_back(*(new linked_indexes<>(text,max((text_offset_type)0,b[i].start),b[i].end,att_pos,len)));
+    v.push_back(*(new linked_indexes<>(text, max((text_offset_type)0, b[i].start), b[i].end, att_pos, len,sa_rmq,sa)));
   }
   return v;
 }
 
-template<
-  typename char_type = std::uint8_t,
-  typename text_offset_type = std::int64_t>
-class st_att{
-  private:
-    text_offset_type tau;
-    text_offset_type gamma;
-    text_offset_type alpha;
-    text_offset_type n;
-    std::vector<text_offset_type>att_pos;
-    std::vector<text_offset_type>b_si;
-    std::vector<std::vector<linked_indexes<>>>indexes;
-    std::map<text_offset_type,text_offset_type>att_map;
-    std::vector<char *>v_s;
-    char_type *t;
-  public:
-    st_att(text_offset_type m_tau, char_type * text, text_offset_type text_length){
-      typedef std::pair<text_offset_type, text_offset_type> pair_type;
-      n = text_length;
-      text_offset_type block_len;
-      tau = m_tau;
-      std::vector<Block<>> v;
-      t = text;
-      // Allocate SA.
-      text_offset_type * const sa = new text_offset_type[n];
+template <
+    typename char_type = std::uint8_t,
+    typename text_offset_type = std::int64_t>
+class st_att
+{
+private:
+  text_offset_type tau;
+  text_offset_type gamma;
+  text_offset_type alpha;
+  text_offset_type n;
+  std::vector<text_offset_type> att_pos;
+  std::vector<text_offset_type> b_si;
+  std::vector<std::vector<linked_indexes<>>> indexes;
+  std::map<text_offset_type, text_offset_type> att_map;
+  std::vector<char *> v_s;
+  char_type *t;
+  rmq<> *sa_rmq;
 
+public:
+  st_att(text_offset_type m_tau, char_type *text, text_offset_type text_length)
+  {
+    typedef std::pair<text_offset_type, text_offset_type> pair_type;
+    n = text_length;
+    text_offset_type block_len;
+    tau = m_tau;
+    std::vector<Block<>> v;
+    t = text;
+    // Allocate SA.
+    text_offset_type *const sa = new text_offset_type[n];
 
-      // Compute SA.
-      {
-        fprintf(stderr, "Compute SA... \n");
-        const long double start = utils::wclock();
-        compute_sa(text, n, sa);
-        const long double elapsed = utils::wclock() - start;
-        fprintf(stderr, "%.2Lfs\n", elapsed);
-      }
-      
-      // Compute parsing.
-      std::vector<pair_type> parsing;
-      {
-        fprintf(stderr, "Compute LZ77... \n");
-        const long double start = utils::wclock();
-        compute_lz77::kkp2n(text, text_length, sa, parsing);
-        const long double elapsed = utils::wclock() - start;
-        fprintf(stderr, "%.2Lfs\n", elapsed);
-      }
+    // Compute SA.
+    {
+      fprintf(stderr, "Compute SA... \n");
+      const long double start = utils::wclock();
+      compute_sa(text, n, sa);
+      sa_rmq = new rmq<>(sa,n);
+      const long double elapsed = utils::wclock() - start;
+      fprintf(stderr, "%.2Lfs\n", elapsed);
+    }
 
-      //TODO ::Discuss with prof or think about it how to set alpha
-
-      
-
-      //Prepare att_pos
+    // Compute parsing.
+    std::vector<pair_type> parsing;
+    {
       fprintf(stderr, "Compute LZ77... \n");
-      std::uint64_t ind = -1;
-      for(uint32_t i=0; i < parsing.size(); i++) {
-        ind += parsing[i].second ? parsing[i].second : 1;
-        att_map[ind] = i;
-        att_pos.push_back(ind);
-      }
-      gamma = att_pos.size();
-      //Make level 0 and assign alpha 
-      block_len = n / gamma + (n % gamma !=0);
-      for(text_offset_type i = 0; i < n; i+=block_len)
-          v.push_back(Block<>(i, block_len));
+      const long double start = utils::wclock();
+      compute_lz77::kkp2n(text, text_length, sa, parsing);
+      const long double elapsed = utils::wclock() - start;
+      fprintf(stderr, "%.2Lfs\n", elapsed);
+    }
+
+    //TODO ::Discuss with prof or think about it how to set alpha
+
+    //Prepare att_pos
+    fprintf(stderr, "Compute LZ77... \n");
+    std::uint64_t ind = -1;
+    for (uint32_t i = 0; i < parsing.size(); i++)
+    {
+      ind += parsing[i].second ? parsing[i].second : 1;
+      att_map[ind] = i;
+      att_pos.push_back(ind);
+    }
+    gamma = att_pos.size();
+    //Make level 0 and assign alpha
+    block_len = n / gamma + (n % gamma != 0);
+    for (text_offset_type i = 0; i < n; i += block_len)
+      v.push_back(Block<>(i, block_len));
+    b_si.push_back(block_len);
+    indexes.push_back(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa));
+    alpha = max((int)ceil(log(block_len) / log(tau)), 1);
+    //fprintf(stderr, "aplha = %ld",alpha);
+    //Now make all other levels
+    //alpha = 2;
+    while (block_len >= 2 * alpha)
+    {
+      block_len = block_len / tau + (block_len % tau != 0);
       b_si.push_back(block_len);
-      indexes.push_back(make_linked_indexes<>(text,v,att_pos,n));
-      alpha = max((int)ceil(log(block_len)/log(tau)),1);
-      //fprintf(stderr, "aplha = %ld",alpha);
-      //Now make all other levels
-      //alpha = 2;
-      while(block_len >= 2 * alpha)
-      {
-        block_len = block_len / tau + (block_len % tau !=0);
-        b_si.push_back(block_len);
-        v.clear();
-        for(text_offset_type i=0; i < att_pos.size(); i++)
-        {
-          text_offset_type begin = att_pos[i] - tau * block_len;
-          text_offset_type end = att_pos[i] + tau * block_len;
-          for( text_offset_type j=begin; j < end; j+=block_len)
-            v.push_back(Block<>(j,block_len));
-          
-        }
-        if(block_len >= 2 * alpha)
-          indexes.push_back(make_linked_indexes<>(text,v,att_pos,n));
-        else
-          break;  
-      }
-      for(text_offset_type level=0; level < b_si.size();level++)
-        fprintf(stderr,"Level %ld size is %ld\n",level,b_si[level]);
-      for(text_offset_type i =0 ; i < v.size(); i++)
-      {
-        Block<> t = v[i];
-        char *s = new char[t.len];
-        for(text_offset_type j = t.start; j < t.end; j++)
-        {
-          if(j>=0 && j<n)
-            s[j - t.start] = text[j];
-          else
-          s[j - t.start] = '$';
-        }
-        v_s.push_back(s);
-      }
-      fprintf(stderr, "last blocksize is %ld\n",v_s.size());
       v.clear();
+      for (text_offset_type i = 0; i < att_pos.size(); i++)
+      {
+        text_offset_type begin = att_pos[i] - tau * block_len;
+        text_offset_type end = att_pos[i] + tau * block_len;
+        for (text_offset_type j = begin; j < end; j += block_len)
+          v.push_back(Block<>(j, block_len));
+      }
+      if (block_len >= 2 * alpha)
+        indexes.push_back(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa));
+      else
+        break;
+    }
+    for (text_offset_type level = 0; level < b_si.size(); level++)
+      fprintf(stderr, "Level %ld size is %ld\n", level, b_si[level]);
+    for (text_offset_type i = 0; i < v.size(); i++)
+    {
+      Block<> t = v[i];
+      char *s = new char[t.len];
+      for (text_offset_type j = t.start; j < t.end; j++)
+      {
+        if (j >= 0 && j < n)
+          s[j - t.start] = text[j];
+        else
+          s[j - t.start] = '$';
+      }
+      v_s.push_back(s);
+    }
+    fprintf(stderr, "last blocksize is %ld\n", v_s.size());
+    v.clear();
   }
 
   void query_alpha(text_offset_type off, uint32_t level, text_offset_type attractor,
-                   text_offset_type *temp_len, char *s,text_offset_type len)
+                   text_offset_type *temp_len, char *s, text_offset_type len)
   {
     text_offset_type block_position, offset, block_len = b_si[level];
-    fprintf(stderr,"Level = %ld\n",level);
+    fprintf(stderr, "Level = %ld\n", level);
     if (level == 0)
     {
-      block_position = off/block_len;
+      block_position = off / block_len;
       offset = off % block_len;
     }
     else
-    { 
+    {
       block_position = att_map[attractor] * tau * 2 + tau + (off - attractor) / block_len;
       offset = (off - attractor) % block_len;
-      if(offset < 0){
+      if (offset < 0)
+      {
         block_position--;
         offset += block_len;
       }
@@ -266,43 +340,42 @@ class st_att{
     {
       //for(text_offset_type i=offset; i <block_len ; i++)
       //{
-        //fprintf(stderr,"Here querying %ld %ld\n",block_position,offset);
-        s[*temp_len] = v_s[block_position][offset];
-        (*temp_len)++;
-       // fprintf(stderr,"Here2\n");
-        //if(*temp_len==len)
-         // break;
+      //fprintf(stderr,"Here querying %ld %ld\n",block_position,offset);
+      s[*temp_len] = v_s[block_position][offset];
+      (*temp_len)++;
+      // fprintf(stderr,"Here2\n");
+      //if(*temp_len==len)
+      // break;
       //}
       return;
     }
 
     linked_indexes<> l = indexes[level][block_position];
-      
+
     return query_alpha(
-      l.start() + offset, 
-      level + 1,
-      l.p.first,
-      temp_len,
-      s,
-      len
-    );
+        l.start() + offset,
+        level + 1,
+        l.p.first,
+        temp_len,
+        s,
+        len);
   }
 
   //Store expilcit strings here
-  char * query(text_offset_type start, text_offset_type len){
-    char * s = new char[len+1];
-    fprintf(stderr, "Querying %ld to %ld\n",start,start+len-1);
+  char *query(text_offset_type start, text_offset_type len)
+  {
+    char *s = new char[len + 1];
+    fprintf(stderr, "Querying %ld to %ld\n", start, start + len - 1);
     text_offset_type temp_len = 0;
-    while(temp_len!=len)
+    while (temp_len != len)
     {
-      fprintf(stderr, "Querying now position = %ld\n",start+temp_len);
-      query_alpha(start+temp_len,0,-1,&temp_len,s,len);
+      fprintf(stderr, "Querying now position = %ld\n", start + temp_len);
+      query_alpha(start + temp_len, 0, -1, &temp_len, s, len);
     }
 
-    s[len]='\0';
-    return s; 
+    s[len] = '\0';
+    return s;
   }
-
 };
 
-#endif  // __COMPUTE_ST_ATT_HPP_INCLUDED
+#endif // __COMPUTE_ST_ATT_HPP_INCLUDED
