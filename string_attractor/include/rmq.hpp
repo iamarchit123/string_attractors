@@ -44,7 +44,6 @@ class rmq
 		rmq(text_offset_type * const arr,text_offset_type m_n)
 		{
 			n = m_n;
-			//cout << n << endl;
 			text_offset_type x = (text_offset_type)(ceil(log2(n)));
 			text_offset_type max_size = 2*(text_offset_type)pow(2, x) - 1;
 			v.resize(max_size);
@@ -56,10 +55,8 @@ class rmq
 			if (qs < 0 || qe > n-1 || qs > qe)
 			{
 				cout<<"Invalid Input ";
-				cout << qs << " " << qe << " " << n << endl;
 				return -1;
 			}
-			//cout << qs << " " << qe << " " << n << endl;
 			return RMQUtil(0, n-1, qs, qe, 0);
 		}
 

@@ -1,6 +1,0 @@
-/bin/rm -f text_to_st_att *.o
-g++ -Wall -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG -march=native -std=c++0x -o text_to_st_att ./src/main.cpp ./src/utils.cpp
-/bin/rm -f text_to_st_att *.o
-g++ -Wall -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG -march=native -std=c++0x -o text_to_st_att ./src/main.cpp ./src/utils.cpp
-/bin/rm -f text_to_st_att *.o
-g++ -Wall -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG -march=native -std=c++0x -o text_to_st_att ./src/main.cpp ./src/utils.cpp

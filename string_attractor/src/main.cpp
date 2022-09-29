@@ -57,7 +57,6 @@ std::uint8_t *generate_string(int alphabets, int length) {
 
 }
 
-
 //=============================================================================
 // Computes the string atractor parsing of the file given
 // as an argument and write to output file. Then converts it to string attractor
@@ -77,7 +76,7 @@ void test_st_att(void)
     char_type *text;
 
       text_length = 20000;
-      alphabets = 26;
+      alphabets = 2;
       text = generate_string(alphabets, text_length);
     while(testcases--) {
       start = rand()%text_length;
@@ -87,7 +86,7 @@ void test_st_att(void)
         end = start;
         start = temp;
       }
-      st_att<> * st_att_file = new st_att<>(10, text,  text_length);
+      st_att<> * st_att_file = new st_att<>(2, text,  text_length);
       char *x = st_att_file->query(start,end - start + 1);
       for(int i=start; i<= end; i++)
       {

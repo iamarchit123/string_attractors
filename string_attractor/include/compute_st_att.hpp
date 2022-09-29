@@ -100,7 +100,6 @@ struct linked_indexes
     end = min(len-1,end);
     if (end  < 0 || start >=len)
       return;
-    //fprintf(stderr,"Archit here1\n");
     text_offset_type low=0, hi = len-1,r1,r2,mid,temp_st;
     while(low < hi)
     {
@@ -121,8 +120,6 @@ struct linked_indexes
       }
       if(j==(end+1))
         hi = mid;
-      //fprintf(stderr,"Archit Chuda1 ,low = %ld hi = %ld\n , j = %ld , end = %ld\n",low,hi,
-      //j,end);
     }
 
     r1 = low;
@@ -146,12 +143,10 @@ struct linked_indexes
       }
       if(j==(end+1))
         low = mid;
-      //fprintf(stderr,"Archit Chuda2\n");
     }
     r2 = hi;
     text_offset_type x = sa_rmq->rmq_min(r1,r2);
-    //fprintf(stderr,"Archit here2\n");
-    for(text_offset_type k = 0 ; k < att_pos.size(); k++)
+    for(text_offset_type k = 0 ; k < (long int)att_pos.size(); k++)
     {
       if(att_pos[k]>=x && att_pos[k] <= (x + end - start))
       {
@@ -162,33 +157,6 @@ struct linked_indexes
     }
 
     //This is very slow !! need to implement RMQ with binary search later on toop of it
-    /**attractor_loc_ = -1;
-    *offset = -1;
-    end = min(len - 1, end);
-    for (text_offset_type i = 0; i < len; i++)
-    {
-
-      text_offset_type j;
-      for (j = start; j <= end && j < len; j++)
-      {
-        if (text[i + j - start] != text[j])
-          break;
-      }
-      if (j == end + 1 || j == len)
-      {
-        for (text_offset_type k = 0; k < att_pos.size(); k++)
-        {
-          if (att_pos[k] >= i && att_pos[k] <= (i + j - start))
-          {
-            *attractor_loc_ = att_pos[k];
-            *offset = att_pos[k] - i;
-            return;
-          }
-        }
-        fprintf(stderr, "Couldn't find a match the program may not work ahead\n");
-        exit(-1);
-      }
-    }*/
   }
 };
 
@@ -201,7 +169,7 @@ std::vector<linked_indexes<>> make_linked_indexes(char_type *text, std::vector<B
                                                   text_offset_type * const sa)
 {
   std::vector<linked_indexes<>> v;
-  for (text_offset_type i = 0; i < b.size(); i++)
+  for (text_offset_type i = 0; i < (long int)b.size(); i++)
   {
     v.push_back(*(new linked_indexes<>(text, max((text_offset_type)0, b[i].start), b[i].end, att_pos, len,sa_rmq,sa)));
   }
@@ -240,28 +208,17 @@ public:
 
     // Compute SA.
     {
-      fprintf(stderr, "Compute SA... \n");
-      const long double start = utils::wclock();
       compute_sa(text, n, sa);
       sa_rmq = new rmq<>(sa,n);
-      const long double elapsed = utils::wclock() - start;
-      fprintf(stderr, "%.2Lfs\n", elapsed);
     }
 
     // Compute parsing.
     std::vector<pair_type> parsing;
-    {
-      fprintf(stderr, "Compute LZ77... \n");
-      const long double start = utils::wclock();
       compute_lz77::kkp2n(text, text_length, sa, parsing);
-      const long double elapsed = utils::wclock() - start;
-      fprintf(stderr, "%.2Lfs\n", elapsed);
-    }
 
     //TODO ::Discuss with prof or think about it how to set alpha
 
     //Prepare att_pos
-    fprintf(stderr, "Compute LZ77... \n");
     std::uint64_t ind = -1;
     for (uint32_t i = 0; i < parsing.size(); i++)
     {
@@ -277,15 +234,14 @@ public:
     b_si.push_back(block_len);
     indexes.push_back(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa));
     alpha = max((int)ceil(log(block_len) / log(tau)), 1);
-    //fprintf(stderr, "aplha = %ld",alpha);
     //Now make all other levels
-    //alpha = 2;
+    alpha = 3;
     while (block_len >= 2 * alpha)
     {
       block_len = block_len / tau + (block_len % tau != 0);
       b_si.push_back(block_len);
       v.clear();
-      for (text_offset_type i = 0; i < att_pos.size(); i++)
+      for (text_offset_type i = 0; i < (long int)att_pos.size(); i++)
       {
         text_offset_type begin = att_pos[i] - tau * block_len;
         text_offset_type end = att_pos[i] + tau * block_len;
@@ -297,30 +253,26 @@ public:
       else
         break;
     }
-    for (text_offset_type level = 0; level < b_si.size(); level++)
-      fprintf(stderr, "Level %ld size is %ld\n", level, b_si[level]);
-    for (text_offset_type i = 0; i < v.size(); i++)
+    
+    for (text_offset_type i = 0; i < (long int)v.size(); i++)
     {
-      Block<> t = v[i];
-      char *s = new char[t.len];
-      for (text_offset_type j = t.start; j < t.end; j++)
+      Block<> bl = v[i];
+      char *s = new char[bl.len];
+      for (text_offset_type j = bl.start; j < bl.end; j++)
       {
         if (j >= 0 && j < n)
-          s[j - t.start] = text[j];
+          s[j - bl.start] = text[j];
         else
-          s[j - t.start] = '$';
+          s[j - bl.start] = '$';
       }
       v_s.push_back(s);
     }
-    fprintf(stderr, "last blocksize is %ld\n", v_s.size());
     v.clear();
   }
 
-  void query_alpha(text_offset_type off, uint32_t level, text_offset_type attractor,
-                   text_offset_type *temp_len, char *s, text_offset_type len)
+  char query(text_offset_type off, uint32_t level, text_offset_type attractor)
   {
     text_offset_type block_position, offset, block_len = b_si[level];
-    fprintf(stderr, "Level = %ld\n", level);
     if (level == 0)
     {
       block_position = off / block_len;
@@ -337,44 +289,18 @@ public:
       }
     }
     if (level == b_si.size() - 1)
-    {
-      //for(text_offset_type i=offset; i <block_len ; i++)
-      //{
-      //fprintf(stderr,"Here querying %ld %ld\n",block_position,offset);
-      s[*temp_len] = v_s[block_position][offset];
-      (*temp_len)++;
-      // fprintf(stderr,"Here2\n");
-      //if(*temp_len==len)
-      // break;
-      //}
-      return;
-    }
+     return  v_s[block_position][offset];
 
     linked_indexes<> l = indexes[level][block_position];
 
-    return query_alpha(
+    return query(
         l.start() + offset,
         level + 1,
-        l.p.first,
-        temp_len,
-        s,
-        len);
+        l.p.first);
   }
-
-  //Store expilcit strings here
-  char *query(text_offset_type start, text_offset_type len)
-  {
-    char *s = new char[len + 1];
-    fprintf(stderr, "Querying %ld to %ld\n", start, start + len - 1);
-    text_offset_type temp_len = 0;
-    while (temp_len != len)
-    {
-      fprintf(stderr, "Querying now position = %ld\n", start + temp_len);
-      query_alpha(start + temp_len, 0, -1, &temp_len, s, len);
-    }
-
-    s[len] = '\0';
-    return s;
+  //Query alphabet at anindex
+  char query(text_offset_type index){
+    return query(index,0,-1);
   }
 };
 
