@@ -150,7 +150,7 @@ struct linked_indexes
     {
       if(att_pos[k]>=x && att_pos[k] <= (x + end - start))
       {
-            *attractor_loc_ = att_pos[k];
+            *attractor_loc_ = k;
             *offset = att_pos[k] - x;
             return;
       }
@@ -163,16 +163,14 @@ struct linked_indexes
 template <
     typename char_type = std::uint8_t,
     typename text_offset_type = std::int64_t>
-std::vector<linked_indexes<>> make_linked_indexes(char_type *text, std::vector<Block<>> &b,
+std::vector<linked_indexes<> *> make_linked_indexes(char_type *text, std::vector<Block<>> &b,
                                                   std::vector<text_offset_type> &att_pos, text_offset_type len,
                                                   rmq<> *sa_rmq,
                                                   text_offset_type * const sa)
 {
-  std::vector<linked_indexes<>> v;
+  std::vector<linked_indexes<>*> v;
   for (text_offset_type i = 0; i < (long int)b.size(); i++)
-  {
-    v.push_back(*(new linked_indexes<>(text, max((text_offset_type)0, b[i].start), b[i].end, att_pos, len,sa_rmq,sa)));
-  }
+    v.push_back((new linked_indexes<>(text, max((text_offset_type)0, b[i].start), b[i].end, att_pos, len,sa_rmq,sa)));
   return v;
 }
 
@@ -188,8 +186,7 @@ private:
   text_offset_type n;
   std::vector<text_offset_type> att_pos;
   std::vector<text_offset_type> b_si;
-  std::vector<std::vector<linked_indexes<>>> indexes;
-  std::map<text_offset_type, text_offset_type> att_map;
+  std::vector<std::vector<linked_indexes<> *>> indexes;
   std::vector<char *> v_s;
   char_type *t;
   rmq<> *sa_rmq;
@@ -223,7 +220,6 @@ public:
     for (uint32_t i = 0; i < parsing.size(); i++)
     {
       ind += parsing[i].second ? parsing[i].second : 1;
-      att_map[ind] = i;
       att_pos.push_back(ind);
     }
     gamma = att_pos.size();
@@ -235,7 +231,6 @@ public:
     indexes.push_back(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa));
     alpha = max((int)ceil(log(block_len) / log(tau)), 1);
     //Now make all other levels
-    alpha = 3;
     while (block_len >= 2 * alpha)
     {
       block_len = block_len / tau + (block_len % tau != 0);
@@ -268,6 +263,9 @@ public:
       v_s.push_back(s);
     }
     v.clear();
+    att_pos.clear();
+    delete[] sa;
+    delete sa_rmq;
   }
 
   char query(text_offset_type off, uint32_t level, text_offset_type attractor)
@@ -280,7 +278,7 @@ public:
     }
     else
     {
-      block_position = att_map[attractor] * tau * 2 + tau + (off - attractor) / block_len;
+      block_position = attractor * tau * 2 + tau + (off - attractor) / block_len;
       offset = (off - attractor) % block_len;
       if (offset < 0)
       {
@@ -291,17 +289,29 @@ public:
     if (level == b_si.size() - 1)
      return  v_s[block_position][offset];
 
-    linked_indexes<> l = indexes[level][block_position];
+    linked_indexes<> *l = indexes[level][block_position];
 
     return query(
-        l.start() + offset,
+        l->start() + offset,
         level + 1,
-        l.p.first);
+        l->p.first);
   }
   //Query alphabet at anindex
   char query(text_offset_type index){
     return query(index,0,-1);
   }
+  ~st_att(){
+    for(unsigned long i=0;i<indexes.size();i++){
+      for(unsigned long j=0;j<indexes[i].size();j++)
+        delete(indexes[i][j]);
+    }
+    indexes.clear();
+    for(unsigned long i=0;i<v_s.size();i++)
+      delete []v_s[i];
+    v_s.clear();
+  }
+
+  
 };
 
 #endif // __COMPUTE_ST_ATT_HPP_INCLUDED

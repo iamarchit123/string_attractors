@@ -74,10 +74,10 @@ void test(
           (std::uint64_t)1,
           (std::uint64_t)max_text_length);
     for (std::uint64_t i = 0; i < text_length; ++i)
-      text[i] = 'a' + utils::random_int<std::uint64_t>(0UL, 3UL);
+      text[i] = 'a' + utils::random_int<std::uint64_t>(0UL, 4);
     
     /* Compute string attractor structure*/
-    st_att<> * st_att_file = new st_att<>(10, text,  text_length);
+    st_att<> * st_att_file = new st_att<>(2, text,  text_length);
     for(text_offset_type index=0; index< text_length; index++){
       char alpha = st_att_file->query(index);
       if(text[index]!=alpha){
@@ -93,63 +93,17 @@ void test(
       std::exit(EXIT_FAILURE);
       }
     }
+    delete(st_att_file);
   }
   delete[] text;
 }
-    /*// Compute SA of text.
-    compute_sa(text, text_length, sa);
-
-    // Compute the parsin using the tested algorithm.
-    std::vector<pair_type> parsing;
-    compute_lz77::kkp2n(text, text_length, sa, parsing);
-
-    // Compute the parsing using naive algorithm.
-    std::vector<pair_type> correct_parsing;
-    naive_lz77_encode(text, text_length, correct_parsing);
-
-    // Compare parsing sizes.
-    bool ok = true;
-    if (parsing.size() != correct_parsing.size()) ok = false;
-    else {
-      for (std::uint64_t i = 0; i < parsing.size(); ++i)
-        if (parsing[i].second != correct_parsing[i].second)
-          ok = false;
-    }
-
-    // Decode computed parsing.
-    char_type *decoded_text =   sequential_lz77_decode
-      <char_type, text_offset_type>(text_length, parsing);
-
-    // Compare decoded text to the original.
-    if (!ok || !std::equal(text, text + text_length, decoded_text)) {
-      fprintf(stderr, "\nError:\n");
-      fprintf(stderr, "  text_length = %lu\n", text_length);
-      fprintf(stderr, "  text = ");
-      for (std::uint64_t i = 0; i < text_length; ++i)
-        fprintf(stderr, "%c", text[i]);
-      fprintf(stderr, "\n");
-      fprintf(stderr, "  correct parsing size = %lu\n",
-          correct_parsing.size());
-      fprintf(stderr, "  compute parsing size = %lu\n",
-          parsing.size());
-      std::exit(EXIT_FAILURE);
-    }
-
-    // Clean up.
-    delete[] decoded_text;
-  }
-
-  // Clean up.
-  delete[] text;
-  delete[] sa;
-  */
 
 int main() {
 
   // Init random number generator.
   srand(time(0) + getpid());
 
-  static const std::uint64_t text_length_limit = (1 << 10);
+  static const std::uint64_t text_length_limit = (1 << 14);
   static const std::uint64_t n_tests = 1000;
 
   typedef std::uint8_t char_type;
