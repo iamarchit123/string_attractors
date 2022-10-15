@@ -202,17 +202,20 @@ public:
     t = text;
     // Allocate SA.
     text_offset_type *const sa = new text_offset_type[n];
-
+    fprintf(stderr,"  Archit allocated memory for SA\n");
     // Compute SA.
     {
       compute_sa(text, n, sa);
+      fprintf(stderr,"  Archit computed  SA\n");
       sa_rmq = new rmq<>(sa,n);
+      fprintf(stderr,"  Archit computed  rmq\n");
     }
 
     // Compute parsing.
     std::vector<pair_type> parsing;
       compute_lz77::kkp2n(text, text_length, sa, parsing);
-
+  
+    fprintf(stderr,"  Archit computed parsing\n");
     //TODO ::Discuss with prof or think about it how to set alpha
 
     //Prepare att_pos
@@ -223,6 +226,7 @@ public:
       att_pos.push_back(ind);
     }
     gamma = att_pos.size();
+    fprintf(stderr,"  Archit computed LZ-77\n");
     //Make level 0 and assign alpha
     block_len = n / gamma + (n % gamma != 0);
     for (text_offset_type i = 0; i < n; i += block_len)
@@ -248,7 +252,7 @@ public:
       else
         break;
     }
-    
+    fprintf(stderr,"  Archit made linked indexes\n");
     for (text_offset_type i = 0; i < (long int)v.size(); i++)
     {
       Block<> bl = v[i];
@@ -262,10 +266,12 @@ public:
       }
       v_s.push_back(s);
     }
+    fprintf(stderr,"  Archit put actual string %ld\n");
     v.clear();
     att_pos.clear();
     delete[] sa;
     delete sa_rmq;
+    fprintf(stderr,"  Archit freed memory %ld\n");
   }
 
   char query(text_offset_type off, uint32_t level, text_offset_type attractor)

@@ -1,5 +1,5 @@
 /**
- * @file    main.cpp
+ * @file    construction.cpp
  * @section LICENCE
  *
  * This file is part of Lazy-AVLG v0.1.0
@@ -49,18 +49,23 @@
 // Run tests for text up to a given length on a given number of cases.
 //=============================================================================
 template<typename char_type, typename text_offset_type>
-void test(
+double test(
     const std::uint64_t max_text_length,
     const std::uint64_t testcases) {
-
+  double tot_time = 0.0;
   // Print initial message.
-  fprintf(stderr, "TEST, max_length = %lu, testcases = %lu\n",
+  fprintf(stderr, "TEST, max_length = %lu, testtimes = %lu\n",
       max_text_length, testcases);
 
   
   // Allocate text and SA.
-  char_type * const text = new char_type[max_text_length];
-
+  char_type * const text = (char_type *)calloc(max_text_length,sizeof(char_type));
+  if(!text){
+    fprintf(stderr,"Archit couldn't allocate memory for %ld\n",max_text_length);
+    exit(-1);
+  }
+  else
+    fprintf(stderr,"Archit allocated memory for %ld\n",max_text_length);
   // Run tests.
   for (std::uint64_t testid = 0; testid < testcases; ++testid) {
 
@@ -69,53 +74,46 @@ void test(
       fprintf(stderr, "%.2Lf%%\r", (100.L * testid) / testcases);
 
     // Generate the text.
-    const std::uint64_t text_length =
-      utils::random_int<std::uint64_t>(
-          (std::uint64_t)1,
-          (std::uint64_t)max_text_length);
+    const std::uint64_t text_length = max_text_length;
+    //  utils::random_int<std::uint64_t>(
+    //      (std::uint64_t)1,
+    //      (std::uint64_t)max_text_length);
+    fprintf(stderr,"Archit trying to work with text length %ld\n",text_length);
     for (std::uint64_t i = 0; i < text_length; ++i)
       text[i] = 'a' + utils::random_int<std::uint64_t>(0UL, 4);
-    
+    fprintf(stderr,"Archit wrote letters with text length %ld\n",text_length);
     /* Compute string attractor structure*/
+    double t1 = utils::wclock();
     st_att<> * st_att_file = new st_att<>(2, text,  text_length);
-    for(text_offset_type index=0; index< text_length; index++){
-      char alpha = st_att_file->query(index);
-      if(text[index]!=alpha){
-        fprintf(stderr, "\nError:\n");
-        fprintf(stderr, "  text_length = %lu\n", text_length);
-        fprintf(stderr, "Wrong at index %lu\n",index);
-        fprintf(stderr, "Actual alphabet %c Predicted Alphabet %c\n",text[index], alpha);
-        fprintf(stderr, "  text = ");
-        for (std::uint64_t i = 0; i < text_length; ++i)
-          fprintf(stderr, "%c", text[index]);
-        fprintf(stderr, "\n");
-        
-      std::exit(EXIT_FAILURE);
-      }
-    }
+    tot_time+=(utils::wclock()-t1);
+    fprintf(stderr,"Archit string attractor work complete: %ld\n",text_length);
+    //fprintf(stderr,"Tot time is %f",tot_time);
     delete(st_att_file);
   }
   delete[] text;
+  return tot_time/testcases;
 }
 
 int main() {
 
   // Init random number generator.
   srand(time(0) + getpid());
-
-  static const std::uint64_t text_length_limit = (1 << 20);
-  static const std::uint64_t n_tests = 1000;
+  vector<double> time_to_construct(21,0);
+  static const std::uint64_t text_length_limit = (1 << 17);
+  static const std::uint64_t n_tests = 5;
 
   typedef std::uint8_t char_type;
   typedef long unsigned int text_offset_type;
 
   // Run tests.
+  int ind=0;
   for (std::uint64_t max_text_length = 1;
       max_text_length <= text_length_limit; max_text_length *= 2)
-    test<char_type, text_offset_type>(max_text_length, n_tests);
+    time_to_construct[ind++] = test<char_type, text_offset_type>(max_text_length, n_tests);
 
   // Print summary.
-  fprintf(stderr, "All tests passed.\n");
+  for(long int i=0; i<=20;i++)
+    fprintf(stderr,"Size of string %ld Time to construct : %f\n",(long)1 << i , time_to_construct[i]);
 }
 
 

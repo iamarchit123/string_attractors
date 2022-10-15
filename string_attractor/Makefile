@@ -10,6 +10,9 @@ text_to_st_att:
 
 test_functionality:
 	$(CC) $(CFLAGS) -o test_functionality ./test/main.cpp ./src/utils.cpp
+
+time_to_construct:
+	$(CC) $(CFLAGS) -o test_functionality ./test/construction.cpp ./src/utils.cpp
 clean:
 	/bin/rm -f *.o
 
