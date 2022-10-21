@@ -13,6 +13,10 @@ test_functionality:
 
 time_to_construct:
 	$(CC) $(CFLAGS) -o test_functionality ./test/construction.cpp ./src/utils.cpp
+
+time_to_query:
+	$(CC) $(CFLAGS) -o test_functionality ./test/index_query.cpp ./src/utils.cpp
+
 clean:
 	/bin/rm -f *.o
 
