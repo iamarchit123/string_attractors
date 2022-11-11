@@ -17,6 +17,8 @@ time_to_construct:
 time_to_query:
 	$(CC) $(CFLAGS) -o test_functionality ./test/index_query.cpp ./src/utils.cpp
 
+test_english:
+	$(CC) $(CFLAGS) -o test_english ./test/main_english.cpp ./src/utils.cpp
 clean:
 	/bin/rm -f *.o
 

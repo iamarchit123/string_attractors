@@ -75,19 +75,12 @@ double test(
 
     // Generate the text.
     const std::uint64_t text_length = max_text_length;
-    //  utils::random_int<std::uint64_t>(
-    //      (std::uint64_t)1,
-    //      (std::uint64_t)max_text_length);
-    //fprintf(stderr,"Archit trying to work with text length %ld\n",text_length);
     for (std::uint64_t i = 0; i < text_length; ++i)
       text[i] = 'a' + utils::random_int<std::uint64_t>(0UL, 4);
-    //fprintf(stderr,"Archit wrote letters with text length %ld\n",text_length);
     /* Compute string attractor structure*/
     double t1 = utils::wclock();
     st_att<> * st_att_file = new st_att<>(2, text,  text_length);
     tot_time+=(utils::wclock()-t1);
-    //fprintf(stderr,"Archit string attractor work complete: %ld\n",text_length);
-    //fprintf(stderr,"Tot time is %f",tot_time);
     delete(st_att_file);
   }
   delete[] text;

@@ -146,15 +146,19 @@ struct linked_indexes
     }
     r2 = hi;
     text_offset_type x = sa_rmq->rmq_min(r1,r2);
-    for(text_offset_type k = 0 ; k < (long int)att_pos.size(); k++)
-    {
-      if(att_pos[k]>=x && att_pos[k] <= (x + end - start))
-      {
-            *attractor_loc_ = k;
-            *offset = att_pos[k] - x;
-            return;
-      }
+    low = 0;
+    hi = att_pos.size() - 1;
+    while(low < hi){
+      mid = (low+hi)/2;
+      if(att_pos[mid] < x)
+        low = mid + 1;
+      else
+        hi = mid;
     }
+    *attractor_loc_ = low;
+    *offset = att_pos[low] - x;
+    return;
+    
 
     //This is very slow !! need to implement RMQ with binary search later on toop of it
   }
@@ -187,7 +191,7 @@ private:
   std::vector<text_offset_type> att_pos;
   std::vector<text_offset_type> b_si;
   std::vector<std::vector<linked_indexes<> *>> indexes;
-  std::vector<char *> v_s;
+  std::vector<char_type *> v_s;
   char_type *t;
   rmq<> *sa_rmq;
 
@@ -201,6 +205,7 @@ public:
     std::vector<Block<>> v;
     t = text;
     // Allocate SA.
+    fprintf(stderr,"2\n");
     text_offset_type *const sa = new text_offset_type[n];
     uint64_t *const sa_temp = new uint64_t[n];
     //fprintf(stderr,"  Archit allocated memory for SA\n");
@@ -213,11 +218,12 @@ public:
       sa_rmq = new rmq<>(sa,n);
       //fprintf(stderr,"  Archit computed  rmq\n");
     }
-
+    fprintf(stderr,"3\n");
     // Compute parsing.
     std::vector<pair_type> parsing;
       compute_lz77::kkp2n(text, text_length, sa, parsing);
   
+    fprintf(stderr,"4\n");
     //fprintf(stderr,"  Archit computed parsing\n");
     //TODO ::Discuss with prof or think about it how to set alpha
 
@@ -229,52 +235,69 @@ public:
       att_pos.push_back(ind);
     }
     gamma = att_pos.size();
+    fprintf(stderr,"5\n");
     //fprintf(stderr,"  Archit computed LZ-77\n");
     //Make level 0 and assign alpha
     block_len = n / gamma + (n % gamma != 0);
     for (text_offset_type i = 0; i < n; i += block_len)
-      v.push_back(Block<>(i, block_len));
+      v.push_back(std::move(Block<>(i, block_len)));
     b_si.push_back(block_len);
     indexes.push_back(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa));
     alpha = max((int)ceil(log(block_len) / log(tau)), 1);
     //fprintf(stderr,"  Archit block_len: %ld tau: %ld gamma : %ld\n",block_len,alpha,gamma);
     //Now make all other levels
+    fprintf(stderr,"6\n");
     while (block_len >= 2 * alpha)
     {
       block_len = block_len / tau + (block_len % tau != 0);
       b_si.push_back(block_len);
       v.clear();
+      fprintf(stderr,"6.1 att_pos size: %ld\n",att_pos.size());
       for (text_offset_type i = 0; i < (long int)att_pos.size(); i++)
       {
         text_offset_type begin = att_pos[i] - tau * block_len;
         text_offset_type end = att_pos[i] + tau * block_len;
-        for (text_offset_type j = begin; j < end; j += block_len)
-          v.push_back(Block<>(j, block_len));
+        for (text_offset_type j = begin; j < end; j += block_len){
+          //fprintf(stderr,"6.1.1: size: %ld capacity:%ld\n",v.size(),v.capacity());
+          v.push_back(std::move(Block<>(j, block_len)));
+          //fprintf(stderr,"6.1.2\n");
+        }
       }
-      if (block_len >= 2 * alpha)
-        indexes.push_back(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa));
+      fprintf(stderr,"6.2\n");
+      if (block_len >= 2 * alpha){
+        indexes.push_back(std::move(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa)));
+        fprintf(stderr,"6.3\n");
+      }
       else
         break;
+      fprintf(stderr,"6.3\n");
     }
+    fprintf(stderr,"7\n");
     //fprintf(stderr,"  Archit made linked indexes\n");
     for (text_offset_type i = 0; i < (long int)v.size(); i++)
     {
       Block<> bl = v[i];
-      char *s = new char[bl.len];
+      char_type *s = new char_type[bl.len];
+      fprintf(stderr,"Starting i=%ld \n",i);
       for (text_offset_type j = bl.start; j < bl.end; j++)
       {
+        fprintf(stderr,"Trying i=%ld j=%ld n=%ld\n",i,j,n);
         if (j >= 0 && j < n)
           s[j - bl.start] = text[j];
         else
           s[j - bl.start] = '$';
       }
+      fprintf(stderr,"Finishing i=%ld\n",i);
       v_s.push_back(s);
+      fprintf(stderr,"Finished i=%ld\n",i);
     }
+    fprintf(stderr,"8\n");
     v.clear();
     att_pos.clear();
     delete[] sa;
     delete[] sa_temp;
     delete sa_rmq;
+    fprintf(stderr,"9\n");
     //fprintf(stderr,"  Archit freed memory %ld\n");
   }
 
