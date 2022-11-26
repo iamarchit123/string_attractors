@@ -78,13 +78,17 @@ void test_conversion(
   for (std::uint64_t i = 0; i < 50000; ++i)
     indexes[i] = utils::random_int<std::uint64_t>(0UL, fsize-1);
   for (std::uint64_t testid = 0; testid < 1; ++testid) {  
+    int count = 0;
     for(text_offset_type index=0; index< 50000; index++){
       double t1 = utils::wclock();
       char_type alpha = st_att_file->query(indexes[index]);
-      if(alpha!=text[indexes[index]])
+      if(alpha!=text[indexes[index]]){
         fprintf(stderr,"actaul alphabet = %d predicted = %d\n",text[indexes[index]], alpha);
+        count++;
+      }
       tot_time+=(utils::wclock()-t1);
     }
+    fprintf(stderr,"count of misclassified = %d\n",count);
   }
   delete(st_att_file);
   delete[] text;

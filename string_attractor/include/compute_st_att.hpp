@@ -44,7 +44,8 @@
 #include "compute_lz77.hpp"
 #include "compute_sa.hpp"
 #include "utils.hpp"
-#include "rmq.hpp"
+//#include "rmq.hpp"
+#include "rmq_tree.hpp"
 #include <cstring>
 #include <map>
 using namespace std;
@@ -77,7 +78,7 @@ struct linked_indexes
 
   linked_indexes(char_type *text, text_offset_type start,
                  text_offset_type end, std::vector<text_offset_type> &att_pos,
-                 text_offset_type len, rmq<> *sa_rmq,
+                 text_offset_type len, rmq_tree<sa_offset_type> *sa_rmq,
                  sa_offset_type * const sa)
   {
     text_offset_type attractor_loc_, offset;
@@ -93,7 +94,7 @@ struct linked_indexes
 
   static void find(char_type *text, text_offset_type start, text_offset_type end,
                    std::vector<text_offset_type> &att_pos, text_offset_type *attractor_loc_,
-                   text_offset_type *offset, text_offset_type len, rmq<> *sa_rmq,
+                   text_offset_type *offset, text_offset_type len, rmq_tree<sa_offset_type> *sa_rmq,
                    sa_offset_type * const sa)
   {
     *attractor_loc_ = -1;
@@ -146,7 +147,7 @@ struct linked_indexes
         low = mid;
     }
     r2 = hi;
-    text_offset_type x = sa_rmq->rmq_min(r1,r2);
+    text_offset_type x = sa[sa_rmq->rmq(r1,r2+1)];
     low = 0;
     hi = att_pos.size() - 1;
     while(low < hi){
@@ -171,7 +172,7 @@ template <
     typename sa_offset_type = std::uint64_t>
 std::vector<linked_indexes<> *> make_linked_indexes(char_type *text, std::vector<Block<>> &b,
                                                   std::vector<text_offset_type> &att_pos, text_offset_type len,
-                                                  rmq<> *sa_rmq,
+                                                  rmq_tree<sa_offset_type> *sa_rmq,
                                                   sa_offset_type * const sa)
 {
   std::vector<linked_indexes<>*> v;
@@ -196,7 +197,8 @@ private:
   std::vector<std::vector<linked_indexes<> *>> indexes;
   std::vector<char_type *> v_s;
   char_type *t;
-  rmq<> *sa_rmq;
+  //rmq<> *sa_rmq;
+  rmq_tree<sa_offset_type> *sa_rmq;
 
 public:
   st_att(text_offset_type m_tau, char_type *text, text_offset_type text_length)
@@ -219,7 +221,9 @@ public:
         sa[i] = (text_offset_type)sa_temp[i];*/
       compute_sa(text, (uint64_t)n, sa);
       fprintf(stderr,"  Archit computed  SA\n");
-      sa_rmq = new rmq<>(sa,n);
+      
+      //sa_rmq = new rmq<>(sa,n);
+      sa_rmq = new rmq_tree<sa_offset_type>(sa,n);
       fprintf(stderr,"  Archit computed  rmq\n");
     }
     fprintf(stderr,"3\n");
