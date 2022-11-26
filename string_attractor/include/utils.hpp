@@ -83,7 +83,9 @@ std::uint64_t file_size(const std::string);
 bool file_exists(const std::string);
 void file_delete(const std::string);
 std::string absolute_path(const std::string);
+#ifdef LINUX
 void empty_page_cache(const std::string);
+#endif
 std::string get_timestamp();
 
 template<typename value_type>

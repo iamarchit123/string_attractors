@@ -63,23 +63,26 @@ void test_conversion(
   fclose(f);
   // Run tests.
   /* Compute string attractor structure*/
-  for(int i=0; i<10;i++){
+ /* for(int i=0; i<10;i++){
     fprintf(stderr,"1\n");
     double t1 = utils::wclock();
     st_att<> * st_att_file = new st_att<>(2, text,  fsize);
     tot_time+=(utils::wclock()-t1);
     fprintf(stderr,"10\n");
     delete(st_att_file);
-  }
-  fprintf(stderr,"Size of string %ld Time to construct : %fs\n",fsize , tot_time/10);
+  }*/
+  
   st_att<> * st_att_file = new st_att<>(2, text,  fsize);
+  fprintf(stderr,"Size of string %ld Time to construct : %fs\n",fsize , tot_time);
   text_offset_type * const indexes = new text_offset_type[50000];
   for (std::uint64_t i = 0; i < 50000; ++i)
     indexes[i] = utils::random_int<std::uint64_t>(0UL, fsize-1);
-  for (std::uint64_t testid = 0; testid < 20; ++testid) {  
+  for (std::uint64_t testid = 0; testid < 1; ++testid) {  
     for(text_offset_type index=0; index< 50000; index++){
       double t1 = utils::wclock();
-      st_att_file->query(indexes[index]);
+      char_type alpha = st_att_file->query(indexes[index]);
+      if(alpha!=text[indexes[index]])
+        fprintf(stderr,"actaul alphabet = %d predicted = %d\n",text[indexes[index]], alpha);
       tot_time+=(utils::wclock()-t1);
     }
   }

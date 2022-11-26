@@ -68,7 +68,8 @@ struct Block
 
 template <
     typename char_type = std::uint8_t,
-    typename text_offset_type = std::int64_t>
+    typename text_offset_type = std::int64_t,
+    typename sa_offset_type = std::uint64_t>
 struct linked_indexes
 {
   typedef std::pair<text_offset_type, text_offset_type> pair_type;
@@ -77,7 +78,7 @@ struct linked_indexes
   linked_indexes(char_type *text, text_offset_type start,
                  text_offset_type end, std::vector<text_offset_type> &att_pos,
                  text_offset_type len, rmq<> *sa_rmq,
-                 text_offset_type * const sa)
+                 sa_offset_type * const sa)
   {
     text_offset_type attractor_loc_, offset;
     find(text, start, end, att_pos, &attractor_loc_, &offset, len,sa_rmq,sa);
@@ -93,7 +94,7 @@ struct linked_indexes
   static void find(char_type *text, text_offset_type start, text_offset_type end,
                    std::vector<text_offset_type> &att_pos, text_offset_type *attractor_loc_,
                    text_offset_type *offset, text_offset_type len, rmq<> *sa_rmq,
-                   text_offset_type * const sa)
+                   sa_offset_type * const sa)
   {
     *attractor_loc_ = -1;
     *offset = -1;
@@ -166,21 +167,23 @@ struct linked_indexes
 
 template <
     typename char_type = std::uint8_t,
-    typename text_offset_type = std::int64_t>
+    typename text_offset_type = std::int64_t,
+    typename sa_offset_type = std::uint64_t>
 std::vector<linked_indexes<> *> make_linked_indexes(char_type *text, std::vector<Block<>> &b,
                                                   std::vector<text_offset_type> &att_pos, text_offset_type len,
                                                   rmq<> *sa_rmq,
-                                                  text_offset_type * const sa)
+                                                  sa_offset_type * const sa)
 {
   std::vector<linked_indexes<>*> v;
-  for (text_offset_type i = 0; i < (long int)b.size(); i++)
-    v.push_back((new linked_indexes<>(text, max((text_offset_type)0, b[i].start), b[i].end, att_pos, len,sa_rmq,sa)));
+  for (text_offset_type i = 0; i < (text_offset_type)b.size(); i++)
+    v.push_back((new linked_indexes<>(text, max((int64_t)0, b[i].start), b[i].end, att_pos, len,sa_rmq,sa)));
   return v;
 }
 
 template <
     typename char_type = std::uint8_t,
-    typename text_offset_type = std::int64_t>
+    typename text_offset_type = std::int64_t,
+    typename sa_offset_type = std::uint64_t>
 class st_att
 {
 private:
@@ -198,7 +201,7 @@ private:
 public:
   st_att(text_offset_type m_tau, char_type *text, text_offset_type text_length)
   {
-    typedef std::pair<text_offset_type, text_offset_type> pair_type;
+    typedef std::pair<sa_offset_type, sa_offset_type> pair_type;
     n = text_length;
     text_offset_type block_len;
     tau = m_tau;
@@ -206,22 +209,23 @@ public:
     t = text;
     // Allocate SA.
     fprintf(stderr,"2\n");
-    text_offset_type *const sa = new text_offset_type[n];
-    uint64_t *const sa_temp = new uint64_t[n];
-    //fprintf(stderr,"  Archit allocated memory for SA\n");
+    sa_offset_type *const sa = new sa_offset_type[n];
+    //uint64_t *const sa_temp = new uint64_t[n];
+    fprintf(stderr,"  Archit allocated memory for SA\n");
     // Compute SA.
     {
-      compute_sa(text, (uint64_t)n, sa_temp);
+      /*compute_sa(text, (uint64_t)n, sa_temp);
       for(text_offset_type i=0; i < n; i++)
-        sa[i] = (text_offset_type)sa_temp[i];
-      //fprintf(stderr,"  Archit computed  SA\n");
+        sa[i] = (text_offset_type)sa_temp[i];*/
+      compute_sa(text, (uint64_t)n, sa);
+      fprintf(stderr,"  Archit computed  SA\n");
       sa_rmq = new rmq<>(sa,n);
-      //fprintf(stderr,"  Archit computed  rmq\n");
+      fprintf(stderr,"  Archit computed  rmq\n");
     }
     fprintf(stderr,"3\n");
     // Compute parsing.
     std::vector<pair_type> parsing;
-      compute_lz77::kkp2n(text, text_length, sa, parsing);
+       compute_lz77::kkp2n(text, text_length, sa, parsing);
   
     fprintf(stderr,"4\n");
     //fprintf(stderr,"  Archit computed parsing\n");
@@ -240,7 +244,7 @@ public:
     //Make level 0 and assign alpha
     block_len = n / gamma + (n % gamma != 0);
     for (text_offset_type i = 0; i < n; i += block_len)
-      v.push_back(std::move(Block<>(i, block_len)));
+      v.push_back(Block<>(i, block_len));
     b_si.push_back(block_len);
     indexes.push_back(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa));
     alpha = max((int)ceil(log(block_len) / log(tau)), 1);
@@ -252,21 +256,18 @@ public:
       block_len = block_len / tau + (block_len % tau != 0);
       b_si.push_back(block_len);
       v.clear();
-      fprintf(stderr,"6.1 att_pos size: %ld\n",att_pos.size());
-      for (text_offset_type i = 0; i < (long int)att_pos.size(); i++)
+      for (text_offset_type i = 0; i < (int64_t)att_pos.size(); i++)
       {
         text_offset_type begin = att_pos[i] - tau * block_len;
         text_offset_type end = att_pos[i] + tau * block_len;
         for (text_offset_type j = begin; j < end; j += block_len){
           //fprintf(stderr,"6.1.1: size: %ld capacity:%ld\n",v.size(),v.capacity());
-          v.push_back(std::move(Block<>(j, block_len)));
+          v.push_back(Block<>(j, block_len));
           //fprintf(stderr,"6.1.2\n");
         }
       }
-      fprintf(stderr,"6.2\n");
       if (block_len >= 2 * alpha){
         indexes.push_back(std::move(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa)));
-        fprintf(stderr,"6.3\n");
       }
       else
         break;
@@ -274,28 +275,25 @@ public:
     }
     fprintf(stderr,"7\n");
     //fprintf(stderr,"  Archit made linked indexes\n");
-    for (text_offset_type i = 0; i < (long int)v.size(); i++)
+    for (text_offset_type i = 0; i < (text_offset_type)v.size(); i++)
     {
       Block<> bl = v[i];
       char_type *s = new char_type[bl.len];
-      fprintf(stderr,"Starting i=%ld \n",i);
-      for (text_offset_type j = bl.start; j < bl.end; j++)
+      for (int64_t j = bl.start; j < bl.end; j++)
       {
-        fprintf(stderr,"Trying i=%ld j=%ld n=%ld\n",i,j,n);
-        if (j >= 0 && j < n)
+        if (j >= 0 && j < (int64_t)n)
           s[j - bl.start] = text[j];
         else
           s[j - bl.start] = '$';
       }
-      fprintf(stderr,"Finishing i=%ld\n",i);
       v_s.push_back(s);
-      fprintf(stderr,"Finished i=%ld\n",i);
+      
     }
     fprintf(stderr,"8\n");
     v.clear();
     att_pos.clear();
     delete[] sa;
-    delete[] sa_temp;
+    //delete[] sa_temp;
     delete sa_rmq;
     fprintf(stderr,"9\n");
     //fprintf(stderr,"  Archit freed memory %ld\n");

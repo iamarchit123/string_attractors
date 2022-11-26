@@ -5,7 +5,7 @@ using namespace std;
 
 template<
   typename char_type = std::uint8_t,
-  typename text_offset_type = std::int64_t>
+  typename text_offset_type = std::uint64_t>
 class rmq
 {
 	private:

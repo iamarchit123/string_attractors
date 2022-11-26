@@ -220,6 +220,7 @@ std::string absolute_path(std::string filename) {
   return std::string(path);
 }
 
+#ifdef LINUX
 void empty_page_cache(const std::string filename) {
   const int fd = open(filename.c_str(), O_RDWR);
   if (fd == -1) {
@@ -236,6 +237,7 @@ std::string get_timestamp() {
   const std::time_t result = std::time(NULL);
   return std::string(std::ctime(&result));
 }
+#endif
 
 template<>
 std::uint32_t random_int(

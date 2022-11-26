@@ -1,8 +1,13 @@
 SHELL = /bin/sh
 CC = g++
-CFLAGS = -Wall -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG -march=native -std=c++0x
-#CFLAGS = -Wall -Wextra -pedantic -Wshadow -g2 -std=c++0x
-
+CFLAGS = -Wall -Wextra -pedantic -Wshadow -funroll-loops -O3 -DNDEBUG -std=c++0x
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	CFLAGS += -D LINUX
+endif
+ifeq ($(UNAME_S),Darwin)
+    CFLAGS += -D OSX
+endif
 all: text_to_st_att test
 
 text_to_st_att:
