@@ -210,32 +210,16 @@ public:
     std::vector<Block<>> v;
     t = text;
     // Allocate SA.
-    fprintf(stderr,"2\n");
     sa_offset_type *const sa = new sa_offset_type[n];
-    //uint64_t *const sa_temp = new uint64_t[n];
-    fprintf(stderr,"  Archit allocated memory for SA\n");
     // Compute SA.
     {
-      /*compute_sa(text, (uint64_t)n, sa_temp);
-      for(text_offset_type i=0; i < n; i++)
-        sa[i] = (text_offset_type)sa_temp[i];*/
       compute_sa(text, (uint64_t)n, sa);
-      fprintf(stderr,"  Archit computed  SA\n");
-      
-      //sa_rmq = new rmq<>(sa,n);
       sa_rmq = new rmq_tree<sa_offset_type>(sa,n);
-      fprintf(stderr,"  Archit computed  rmq\n");
     }
-    fprintf(stderr,"3\n");
     // Compute parsing.
     std::vector<pair_type> parsing;
        compute_lz77::kkp2n(text, text_length, sa, parsing);
   
-    fprintf(stderr,"4\n");
-    //fprintf(stderr,"  Archit computed parsing\n");
-    //TODO ::Discuss with prof or think about it how to set alpha
-
-    //Prepare att_pos
     std::uint64_t ind = -1;
     for (uint32_t i = 0; i < parsing.size(); i++)
     {
@@ -243,8 +227,7 @@ public:
       att_pos.push_back(ind);
     }
     gamma = att_pos.size();
-    fprintf(stderr,"5\n");
-    //fprintf(stderr,"  Archit computed LZ-77\n");
+    
     //Make level 0 and assign alpha
     block_len = n / gamma + (n % gamma != 0);
     for (text_offset_type i = 0; i < n; i += block_len)
@@ -252,9 +235,7 @@ public:
     b_si.push_back(block_len);
     indexes.push_back(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa));
     alpha = max((int)ceil(log(block_len) / log(tau)), 1);
-    //fprintf(stderr,"  Archit block_len: %ld tau: %ld gamma : %ld\n",block_len,alpha,gamma);
     //Now make all other levels
-    fprintf(stderr,"6\n");
     while (block_len >= 2 * alpha)
     {
       block_len = block_len / tau + (block_len % tau != 0);
@@ -265,20 +246,15 @@ public:
         text_offset_type begin = att_pos[i] - tau * block_len;
         text_offset_type end = att_pos[i] + tau * block_len;
         for (text_offset_type j = begin; j < end; j += block_len){
-          //fprintf(stderr,"6.1.1: size: %ld capacity:%ld\n",v.size(),v.capacity());
           v.push_back(Block<>(j, block_len));
-          //fprintf(stderr,"6.1.2\n");
         }
       }
-      if (block_len >= 2 * alpha){
+      if (block_len >= 2 * alpha)
         indexes.push_back(std::move(make_linked_indexes<>(text, v, att_pos, n,sa_rmq,sa)));
-      }
       else
         break;
-      fprintf(stderr,"6.3\n");
+      
     }
-    fprintf(stderr,"7\n");
-    //fprintf(stderr,"  Archit made linked indexes\n");
     for (text_offset_type i = 0; i < (text_offset_type)v.size(); i++)
     {
       Block<> bl = v[i];
@@ -293,14 +269,10 @@ public:
       v_s.push_back(s);
       
     }
-    fprintf(stderr,"8\n");
     v.clear();
     att_pos.clear();
     delete[] sa;
-    //delete[] sa_temp;
     delete sa_rmq;
-    fprintf(stderr,"9\n");
-    //fprintf(stderr,"  Archit freed memory %ld\n");
   }
 
   char query(text_offset_type off, uint32_t level, text_offset_type attractor)
@@ -345,8 +317,6 @@ public:
       delete []v_s[i];
     v_s.clear();
   }
-
-  
 };
 
 #endif // __COMPUTE_ST_ATT_HPP_INCLUDED

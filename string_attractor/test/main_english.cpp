@@ -62,38 +62,30 @@ void test_conversion(
   if (result != fsize) {fputs ("Reading error",stderr); exit (3);}
   fclose(f);
   // Run tests.
-  /* Compute string attractor structure*/
- /* for(int i=0; i<10;i++){
-    fprintf(stderr,"1\n");
+  /* Compute string attractor structure time*/
+ for(int i=0; i<10;i++){
     double t1 = utils::wclock();
     st_att<> * st_att_file = new st_att<>(2, text,  fsize);
     tot_time+=(utils::wclock()-t1);
-    fprintf(stderr,"10\n");
     delete(st_att_file);
-  }*/
-  
+  }
+  fprintf(stderr,"Size of string %llu Time to construct : %fs\n",fsize , tot_time);
   st_att<> * st_att_file = new st_att<>(2, text,  fsize);
-  fprintf(stderr,"Size of string %ld Time to construct : %fs\n",fsize , tot_time);
+  tot_time = 0;
   text_offset_type * const indexes = new text_offset_type[50000];
   for (std::uint64_t i = 0; i < 50000; ++i)
     indexes[i] = utils::random_int<std::uint64_t>(0UL, fsize-1);
-  for (std::uint64_t testid = 0; testid < 1; ++testid) {  
-    int count = 0;
+  for (std::uint64_t testid = 0; testid < 20; ++testid) {  
     for(text_offset_type index=0; index< 50000; index++){
       double t1 = utils::wclock();
-      char_type alpha = st_att_file->query(indexes[index]);
-      if(alpha!=text[indexes[index]]){
-        fprintf(stderr,"actaul alphabet = %d predicted = %d\n",text[indexes[index]], alpha);
-        count++;
-      }
+      st_att_file->query(indexes[index]);
       tot_time+=(utils::wclock()-t1);
     }
-    fprintf(stderr,"count of misclassified = %d\n",count);
   }
+  fprintf(stderr,"Time for 1 million queries: %fs\n",tot_time);
   delete(st_att_file);
   delete[] text;
   delete[] indexes;
-  fprintf(stderr,"time taken for 1 million queries:%fs\n",tot_time);
 }
 
 int main(int argc, char **argv) {
